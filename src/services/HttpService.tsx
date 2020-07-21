@@ -32,7 +32,7 @@ export class HttpService {
 
 	public async getAsync<T>(url: string) {
 		try {
-			const response = await this.axiosClient.get<IResult<T>>(url);
+			const response = await this.axiosClient.get<T>(url);
 
 			if (response.status !== 200) {
 				throw {
@@ -48,7 +48,23 @@ export class HttpService {
 
 	public async postAsync<T>(url: string, data?: any) {
 		try {
-			const response = await this.axiosClient.post<IResult<T>>(url, data);
+			const response = await this.axiosClient.post<T>(url, data);
+
+			if (response.status !== 200) {
+				throw {
+					status: response.status,
+					statusText: response.statusText
+				};
+			}
+			return response.data;
+		} catch (error) {
+			throw error;
+		}
+	}
+
+	public async deleteAsync<T>(url: string) {
+		try {
+			const response = await this.axiosClient.delete<T>(url);
 
 			if (response.status !== 200) {
 				throw {

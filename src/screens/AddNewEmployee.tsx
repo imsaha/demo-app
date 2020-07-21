@@ -1,5 +1,13 @@
 import React, { Component } from "react";
-import { View, Text, KeyboardAvoidingView, StyleSheet } from "react-native";
+import {
+	View,
+	Text,
+	KeyboardAvoidingView,
+	StyleSheet,
+	FlatList,
+	Alert,
+	ActivityIndicator
+} from "react-native";
 import { IEmployee } from "../models/employee.model";
 import { TextInput, ScrollView } from "react-native-gesture-handler";
 import {
@@ -17,40 +25,55 @@ import {
 } from "native-base";
 import Colors from "../constraints/Colors";
 import { IIdName } from "../models/common.model";
+import ApiService from "../services/ApiService";
 
 interface IAddNewEmployeeScreenState {
 	employee: IEmployee;
 	departments: IIdName[];
+	saving?: boolean;
+	deleting?: boolean;
 }
 
 export default class AddNewEmployeeScreen extends React.Component<
 	any,
 	IAddNewEmployeeScreenState
 > {
+	private readonly api: ApiService;
 	constructor(props: any) {
 		super(props);
 
+		this.api = new ApiService();
 		this.state = {
 			employee: props.route?.params ?? {
 				firstName: "",
 				lastName: "",
-				designation: ""
+				designation: "",
+				department: {
+					id: 0,
+					name: ""
+				}
 			},
 			departments: []
 		};
 	}
 
-	componentDidMount() {
+	async componentDidMount() {
 		const { employee } = this.state;
 		if (employee) {
+			const fullName = `${employee.firstName} ${employee.lastName}`;
 			this.props.navigation.setOptions({
-				title: `${employee.firstName} ${employee.lastName}`,
-				headerRight: null
+				title: fullName && fullName.length > 1 ? fullName : "Add new"
 			});
 		}
 
 		this.props.navigation.setOptions({
 			headerRight: null
+		});
+
+		const departments = await this.api.getDepartmentsAsync();
+		this.setState({
+			departments,
+			employee
 		});
 	}
 
@@ -78,12 +101,94 @@ export default class AddNewEmployeeScreen extends React.Component<
 		});
 	};
 
-	handleSave = () => {
-		console.log(this.state.employee);
+	handleDepartmentValueChange = (value: number) => {
+		const { employee } = this.state;
+		employee.department.id = value;
+		this.setState({ employee });
+	};
+
+	handleSaveAsync = async () => {
+		const { employee, saving: isSaving } = this.state;
+		this.setState({ saving: true });
+		try {
+			if (
+				employee.firstName &&
+				employee.lastName &&
+				employee.department.id > 0
+			) {
+				const response = await this.api.postEmployeeAsync(employee);
+				if (response > 0) {
+					employee.id = response;
+					this.setState({ employee });
+					this.props.navigation.goBack();
+				} else {
+					console.warn(response);
+					Alert.alert("Error", "Opps, something went wrong!");
+				}
+			} else {
+				Alert.alert("Missing data!", "All fields are required.");
+			}
+		} catch (error) {
+			console.warn(error);
+		} finally {
+			this.setState({ saving: false });
+		}
+	};
+
+	handleDeleteAsync = async () => {
+		this.setState({ deleting: true });
+		const { employee } = this.state;
+		try {
+			const result = Alert.alert(
+				"Confirm",
+				"Are you sure, you want to delete?",
+				[
+					{
+						text: "Cancel"
+					},
+					{
+						text: "Delete",
+						onPress: async () => {
+							try {
+								const response = await this.api.deleteEmployeeByIdAsync(
+									employee.id
+								);
+								if (response) {
+									this.setState({
+										employee: {
+											id: 0,
+											firstName: "",
+											lastName: "",
+											designation: "",
+											department: {
+												id: 0,
+												name: ""
+											}
+										}
+									});
+								} else {
+									Alert.alert(
+										"Oops!",
+										"Something went wrong."
+									);
+								}
+							} catch (error) {
+								Alert.alert(error.message);
+							}
+						},
+						style: "destructive"
+					}
+				]
+			);
+		} catch (error) {
+			Alert.alert(JSON.stringify(error));
+		} finally {
+			this.setState({ deleting: false });
+		}
 	};
 
 	render() {
-		const { employee, departments } = this.state;
+		const { employee, departments, saving, deleting } = this.state;
 		return (
 			<Container>
 				<Content
@@ -130,23 +235,31 @@ export default class AddNewEmployeeScreen extends React.Component<
 								</Label>
 							</Left>
 							<Right>
-								{departments && departments.length > 0 && (
-									<Picker
-										selectedValue={employee.department?.id}
-										mode="dropdown"
-										placeholder="Select department"
-										iosIcon={<Icon name="arrow-down" />}
-										style={{ width: null }}>
-										{departments.map(department => {
-											return (
-												<Picker.Item
-													label={department.name}
-													value={department.id}
-												/>
-											);
-										})}
-									</Picker>
-								)}
+								<View>
+									{departments && departments.length > 0 && (
+										<Picker
+											selectedValue={
+												employee.department?.id
+											}
+											onValueChange={
+												this.handleDepartmentValueChange
+											}
+											mode="dialog"
+											placeholder="Select department"
+											iosIcon={<Icon name="arrow-down" />}
+											style={{ width: null }}>
+											{departments.map(department => {
+												return (
+													<Picker.Item
+														key={department.id}
+														label={department.name}
+														value={department.id}
+													/>
+												);
+											})}
+										</Picker>
+									)}
+								</View>
 							</Right>
 						</Item>
 
@@ -154,9 +267,50 @@ export default class AddNewEmployeeScreen extends React.Component<
 							style={{
 								marginTop: 30
 							}}>
-							<Button block success onPress={this.handleSave}>
-								<Text>Save</Text>
+							<Button
+								disabled={saving}
+								block
+								success
+								onPress={this.handleSaveAsync}>
+								{saving && (
+									<ActivityIndicator color={Colors.white} />
+								)}
+								<Text
+									style={{
+										padding: 10,
+										color: saving
+											? Colors.gray
+											: Colors.black
+									}}>
+									Save
+								</Text>
 							</Button>
+
+							{employee.id > 0 && (
+								<Button
+									style={{
+										marginTop: 10
+									}}
+									disabled={deleting}
+									block
+									danger
+									onPress={this.handleDeleteAsync}>
+									{deleting && (
+										<ActivityIndicator
+											color={Colors.white}
+										/>
+									)}
+									<Text
+										style={{
+											padding: 10,
+											color: deleting
+												? Colors.gray
+												: Colors.black
+										}}>
+										Delete
+									</Text>
+								</Button>
+							)}
 						</View>
 					</Form>
 				</Content>

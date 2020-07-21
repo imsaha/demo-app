@@ -2,7 +2,7 @@ import React from "react";
 import * as Font from "expo-font";
 import { Ionicons } from "@expo/vector-icons";
 import { AppLoading } from "expo";
-import DemoApp from "./src/DempApp";
+import DemoApp from "./src/DemoApp";
 import { View, Text } from "react-native";
 
 interface IAppState {

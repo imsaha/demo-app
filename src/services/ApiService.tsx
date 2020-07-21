@@ -9,18 +9,22 @@ export default class ApiService {
 	}
 
 	public getDepartmentsAsync() {
-		return this.http.getAsync<IIdName>("types/{lang}/departments");
+		return this.http.getAsync<IIdName[]>("types/{lang}/department");
 	}
 
 	public getEmployeesAsync() {
-		return this.http.getAsync<IIdName>("employees/{lang}");
+		return this.http.getAsync<IEmployee[]>("employees/{lang}");
 	}
 
 	public getEmployeeByIdAsync(id: number) {
-		return this.http.getAsync<IIdName>(`employees/{lang}${id}`);
+		return this.http.getAsync<IEmployee>(`employees/{lang}${id}`);
 	}
 
-	public postEmployee(employee: IEmployee) {
-		return this.http.postAsync<IIdName>(`employees/{lang}`, employee);
+	public postEmployeeAsync(employee: IEmployee) {
+		return this.http.postAsync<number>(`employees/{lang}`, employee);
+	}
+
+	public deleteEmployeeByIdAsync(id: number) {
+		return this.http.deleteAsync<boolean>(`employees/{lang}.${id}`);
 	}
 }
